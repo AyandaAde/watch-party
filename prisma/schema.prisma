@@ -27,6 +27,7 @@ model Movie {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   title      String
   blobUrl    String
+  assetId    String?
   playbackId String?
   duration   Float
   uploadedBy String

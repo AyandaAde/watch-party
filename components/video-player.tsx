@@ -52,25 +52,6 @@ export default function VideoPlayer({
   const [isSeeking, setIsSeeking] = useState(false);
   const [isPictureInPicture, setIsPictureInPicture] = useState(false);
 
-  // const getVideoStream = useQuery({
-  //   queryKey: ['video-stream', movie.blobUrl],
-  //   queryFn: async () => {
-
-  //     if (movie.blobUrl.includes("mkv")) {
-  //       const { data } = await axios.post('/api/create-stream-video',
-  //         { blobUrl: movie.blobUrl }
-  //       );
-
-  //       console.log('data', data.playbackId);
-  //       return data.playbackId;
-  //     } else {
-  //       return movie.blobUrl;
-  //     }
-  //   },
-  //   enabled: !!movie.blobUrl
-  // })
-  // Call onMovieSelect when movie changes
-  
   useEffect(() => {
     onMovieSelect(movie.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,27 +118,13 @@ export default function VideoPlayer({
     }
   };
 
-  const handleSeek = (newTime: number) => {
-    const mediaElement = getMediaElement(videoRef);
-    if (!socket || !mediaElement) return;
-
-    setIsSeeking(true);
-    mediaElement.currentTime = newTime;
-    setCurrentTime(newTime);
-
-    socket.emit('seek', party.id, newTime);
-
-    setTimeout(() => setIsSeeking(false), 500);
-  };
-
   const handleLoadedMetadata = () => {
     const mediaElement = getMediaElement(videoRef);
     if (mediaElement) {
       setDuration(mediaElement.duration);
     }
   };
-
-
+  
   // Listen for Picture-in-Picture changes and enable controls
   useEffect(() => {
     const handlePiPChange = () => {
@@ -245,14 +212,6 @@ export default function VideoPlayer({
       mediaElement.removeEventListener('pause', handlePiPPause);
     };
   }, [videoRef, isPictureInPicture, socket, party.id, isPlaying]);
-
-  // if (getVideoStream.isLoading) {
-  //   return <div>Loading...</div>;
-  // }
-
-  // if (getVideoStream.error) {
-  //   return <div>Error: {getVideoStream.error.message}</div>;
-  // }
 
   return (
     <Card className="bg-card border border-border overflow-hidden">

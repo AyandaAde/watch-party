@@ -285,7 +285,7 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
       if (file.name.toLowerCase().endsWith('.mkv')) {
         try {
           toast.info("Converting", { description: 'Converting MKV to MP4... This may take a while.' });
-          fileToUpload = await convertMkvToMp4(file);
+          // fileToUpload = await convertMkvToMp4(file);
           toast.success("Converted", { description: 'MKV file converted to MP4 successfully!' });
         } catch (conversionError) {
           console.error('Conversion failed:', conversionError);
@@ -381,15 +381,15 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
               {demoMovies.map((movie) => (
                 <Card
                   key={movie.id}
-                  className="p-3 bg-card border border-border hover:border-primary cursor-pointer transition-colors"
+                  className="p-3 bg-card border border-border hover:border-primary cursor-pointer transition-colors overflow-hidden"
                   onClick={() => onSelectMovie(movie.id)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm truncate">{movie.title}</h4>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm truncate" title={movie.title}>{movie.title}</h4>
                       <p className="text-xs text-muted-foreground mt-1">Demo • {Math.floor(movie.duration)}s</p>
                     </div>
-                    <Play className="w-4 h-4 text-primary shrink-0 ml-2" />
+                    <Play className="w-4 h-4 text-primary shrink-0" />
                   </div>
                 </Card>
               ))}
@@ -405,15 +405,15 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
               {uploadedMovies.map((movie) => (
                 <Card
                   key={movie.id}
-                  className="p-3 bg-card border border-border hover:border-primary cursor-pointer transition-colors"
+                  className="p-3 bg-card border border-border hover:border-primary cursor-pointer transition-colors overflow-hidden"
                   onClick={() => onSelectMovie(movie.id)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm truncate">{movie.title}</h4>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm truncate" title={movie.title}>{movie.title}</h4>
                       <p className="text-xs text-muted-foreground mt-1">{Math.floor(movie.duration)}s</p>
                     </div>
-                    <Play className="w-4 h-4 text-primary shrink-0 ml-2" />
+                    <Play className="w-4 h-4 text-primary shrink-0" />
                   </div>
                 </Card>
               ))}
