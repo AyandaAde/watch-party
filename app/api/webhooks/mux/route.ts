@@ -123,12 +123,6 @@ export async function POST(request: Request) {
                   <td style="padding: 8px 0;">${Math.floor((duration || 0) / 60)}m ${Math.floor((duration || 0) % 60)}s</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #E0E0E0;">
-                  <td style="padding: 8px 0; color: #555;"><strong>Playback ID:</strong></td>
-                  <td style="padding: 8px 0;">
-                    <span style="color: #1A237E; text-decoration: none;">${playbackId}</span>
-                  </td>
-                </tr>
-                <tr style="border-bottom: 1px solid #E0E0E0;">
                   <td style="padding: 8px 0; color: #555;"><strong>Date:</strong></td>
                   <td style="padding: 8px 0;">${new Date().toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}</td>
                 </tr>
