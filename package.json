@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "next build && bunx prisma generate",
+    "postinstall": "bunx prisma generate",
     "start": "node server.js",
     "lint": "eslint ."
   },
