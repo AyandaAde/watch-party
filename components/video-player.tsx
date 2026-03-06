@@ -1,8 +1,10 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Maximize, Minimize, Pause, PictureInPicture, Play, Volume1 } from 'lucide-react';
+import MuxPlayer from '@mux/mux-player-react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import { monitorEventLoopDelay } from 'perf_hooks';
 import { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
 
@@ -10,6 +12,7 @@ interface Movie {
   id: string;
   title: string;
   blobUrl: string;
+  playbackId: string;
   duration: number;
 }
 
@@ -25,9 +28,16 @@ interface VideoPlayerProps {
   movie: Movie;
   party: WatchParty;
   socket: Socket | null;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
+  videoRef: React.RefObject<any>;
   onMovieSelect: (movieId: string) => void;
 }
+
+// Helper to get the media element from MuxPlayer ref
+const getMediaElement = (ref: React.RefObject<any>): HTMLVideoElement | null => {
+  if (!ref.current) return null;
+  // MuxPlayer exposes the media element through the media property
+  return ref.current.media || ref.current?.querySelector('video') || null;
+};
 
 export default function VideoPlayer({
   movie,
@@ -39,78 +49,100 @@ export default function VideoPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
   const [isSeeking, setIsSeeking] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPictureInPicture, setIsPictureInPicture] = useState(false);
-  const [isPiPSupported, setIsPiPSupported] = useState(false);
 
-  // Sync state with party updates
+  // const getVideoStream = useQuery({
+  //   queryKey: ['video-stream', movie.blobUrl],
+  //   queryFn: async () => {
+
+  //     if (movie.blobUrl.includes("mkv")) {
+  //       const { data } = await axios.post('/api/create-stream-video',
+  //         { blobUrl: movie.blobUrl }
+  //       );
+
+  //       console.log('data', data.playbackId);
+  //       return data.playbackId;
+  //     } else {
+  //       return movie.blobUrl;
+  //     }
+  //   },
+  //   enabled: !!movie.blobUrl
+  // })
+  // Call onMovieSelect when movie changes
+  
   useEffect(() => {
-    if (videoRef.current && party.currentMovieId === movie.id) {
-      // Sync play/pause state
-      if (party.isPlaying && videoRef.current.paused) {
-        videoRef.current.play().catch(() => {
-          console.log('[v0] Play prevented by browser');
-        });
-        setIsPlaying(true);
-      } else if (!party.isPlaying && !videoRef.current.paused) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
+    onMovieSelect(movie.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movie.id]);
 
-      // Sync time (only if difference is significant to avoid jitter)
-      if (Math.abs(videoRef.current.currentTime - party.currentTime) > 1) {
-        videoRef.current.currentTime = party.currentTime;
-        setCurrentTime(party.currentTime);
-      }
+  // Sync with party state - only update when party state changes
+  useEffect(() => {
+    const mediaElement = getMediaElement(videoRef);
+    if (!mediaElement || party.currentMovieId !== movie.id) return;
+
+    // Sync play/pause state
+    if (party.isPlaying && mediaElement.paused) {
+      mediaElement.play().catch(() => {
+        console.log('[VideoPlayer] Play prevented by browser');
+      });
+      setIsPlaying(true);
+    } else if (!party.isPlaying && !mediaElement.paused) {
+      mediaElement.pause();
+      setIsPlaying(false);
     }
-  }, [party, movie.id, videoRef]);
+
+    // Sync time (only if difference is significant to avoid jitter)
+    if (Math.abs(mediaElement.currentTime - party.currentTime) > 1) {
+      mediaElement.currentTime = party.currentTime;
+      setCurrentTime(party.currentTime);
+    }
+  }, [party.currentMovieId, party.isPlaying, party.currentTime, movie.id, videoRef]);
 
   const handlePlayPause = (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
-    
+
     if (!socket) {
       console.warn('[VideoPlayer] Socket not connected');
       return;
     }
-    
-    if (!videoRef.current) {
+
+    const mediaElement = getMediaElement(videoRef);
+    if (!mediaElement) {
       console.warn('[VideoPlayer] Video element not available');
       return;
     }
 
-    const isCurrentlyPaused = videoRef.current.paused;
-    const currentTime = videoRef.current.currentTime || 0;
-    
-    // Update video element first, then emit socket event
+    const isCurrentlyPaused = mediaElement.paused;
+    const currentTime = mediaElement.currentTime || 0;
+
     if (isCurrentlyPaused) {
-      // Video is paused, so play it
-      videoRef.current.play().catch((error) => {
+      mediaElement.play().catch((error) => {
         console.error('[VideoPlayer] Play failed:', error);
       });
       socket.emit('play', party.id, currentTime);
       setIsPlaying(true);
     } else {
-      // Video is playing, so pause it
-      videoRef.current.pause();
+      mediaElement.pause();
       socket.emit('pause', party.id, currentTime);
       setIsPlaying(false);
     }
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current && !isSeeking) {
-      setCurrentTime(videoRef.current.currentTime);
+    const mediaElement = getMediaElement(videoRef);
+    if (mediaElement && !isSeeking) {
+      setCurrentTime(mediaElement.currentTime);
     }
   };
 
   const handleSeek = (newTime: number) => {
-    if (!socket || !videoRef.current) return;
+    const mediaElement = getMediaElement(videoRef);
+    if (!socket || !mediaElement) return;
 
     setIsSeeking(true);
-    videoRef.current.currentTime = newTime;
+    mediaElement.currentTime = newTime;
     setCurrentTime(newTime);
 
     socket.emit('seek', party.id, newTime);
@@ -119,102 +151,40 @@ export default function VideoPlayer({
   };
 
   const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+    const mediaElement = getMediaElement(videoRef);
+    if (mediaElement) {
+      setDuration(mediaElement.duration);
     }
   };
 
-  const handleFullscreen = async () => {
-    if (!videoRef.current) return;
-
-    try {
-      if (!isFullscreen) {
-        // Enter fullscreen
-        if (videoRef.current.requestFullscreen) {
-          await videoRef.current.requestFullscreen();
-        } else if ((videoRef.current as any).webkitRequestFullscreen) {
-          await (videoRef.current as any).webkitRequestFullscreen();
-        } else if ((videoRef.current as any).mozRequestFullScreen) {
-          await (videoRef.current as any).mozRequestFullScreen();
-        } else if ((videoRef.current as any).msRequestFullscreen) {
-          await (videoRef.current as any).msRequestFullscreen();
-        }
-      } else {
-        // Exit fullscreen
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen();
-        } else if ((document as any).mozCancelFullScreen) {
-          await (document as any).mozCancelFullScreen();
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen();
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling fullscreen:', error);
-    }
-  };
-
-  // Check if Picture-in-Picture is supported
-  useEffect(() => {
-    if (videoRef.current) {
-      setIsPiPSupported(
-        'pictureInPictureEnabled' in document ||
-        (videoRef.current as any).webkitSupportsPresentationMode !== undefined
-      );
-    }
-  }, [videoRef]);
-
-  // Listen for fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(
-        !!(document.fullscreenElement ||
-          (document as any).webkitFullscreenElement ||
-          (document as any).mozFullScreenElement ||
-          (document as any).msFullscreenElement)
-      );
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-    };
-  }, []);
 
   // Listen for Picture-in-Picture changes and enable controls
   useEffect(() => {
     const handlePiPChange = () => {
-      if (videoRef.current) {
-        const isInPiP = 
-          document.pictureInPictureElement === videoRef.current ||
-          (document as any).webkitPictureInPictureElement === videoRef.current;
-        
+      const mediaElement = getMediaElement(videoRef);
+      if (mediaElement) {
+        const isInPiP =
+          document.pictureInPictureElement === mediaElement ||
+          (document as any).webkitPictureInPictureElement === mediaElement;
+
         setIsPictureInPicture(isInPiP);
-        
+
         // Enable native controls when in PiP mode for play/pause functionality
         if (isInPiP) {
-          videoRef.current.setAttribute('controls', '');
+          mediaElement.setAttribute('controls', '');
         } else {
-          videoRef.current.removeAttribute('controls');
+          mediaElement.removeAttribute('controls');
         }
       }
     };
 
-    if (videoRef.current) {
-      videoRef.current.addEventListener('enterpictureinpicture', handlePiPChange);
-      videoRef.current.addEventListener('leavepictureinpicture', handlePiPChange);
+    const mediaElement = getMediaElement(videoRef);
+    if (mediaElement) {
+      mediaElement.addEventListener('enterpictureinpicture', handlePiPChange);
+      mediaElement.addEventListener('leavepictureinpicture', handlePiPChange);
       // WebKit prefix
-      videoRef.current.addEventListener('webkitbeginfullscreen', handlePiPChange);
-      videoRef.current.addEventListener('webkitendfullscreen', handlePiPChange);
+      mediaElement.addEventListener('webkitbeginfullscreen', handlePiPChange);
+      mediaElement.addEventListener('webkitendfullscreen', handlePiPChange);
     }
 
     // Also listen on document
@@ -222,11 +192,12 @@ export default function VideoPlayer({
     document.addEventListener('leavepictureinpicture', handlePiPChange);
 
     return () => {
-      if (videoRef.current) {
-        videoRef.current.removeEventListener('enterpictureinpicture', handlePiPChange);
-        videoRef.current.removeEventListener('leavepictureinpicture', handlePiPChange);
-        videoRef.current.removeEventListener('webkitbeginfullscreen', handlePiPChange);
-        videoRef.current.removeEventListener('webkitendfullscreen', handlePiPChange);
+      const mediaElement = getMediaElement(videoRef);
+      if (mediaElement) {
+        mediaElement.removeEventListener('enterpictureinpicture', handlePiPChange);
+        mediaElement.removeEventListener('leavepictureinpicture', handlePiPChange);
+        mediaElement.removeEventListener('webkitbeginfullscreen', handlePiPChange);
+        mediaElement.removeEventListener('webkitendfullscreen', handlePiPChange);
       }
       document.removeEventListener('enterpictureinpicture', handlePiPChange);
       document.removeEventListener('leavepictureinpicture', handlePiPChange);
@@ -235,17 +206,18 @@ export default function VideoPlayer({
 
   // Handle play/pause events from PiP window controls only
   useEffect(() => {
-    if (!videoRef.current || !socket || !isPictureInPicture) return;
+    const mediaElement = getMediaElement(videoRef);
+    if (!mediaElement || !socket || !isPictureInPicture) return;
 
     let isHandlingPiP = false;
 
     const handlePiPPlay = (e: Event) => {
       // Only handle if in PiP mode and not already handling
-      if (isPictureInPicture && !isHandlingPiP && videoRef.current) {
+      if (isPictureInPicture && !isHandlingPiP && mediaElement) {
         isHandlingPiP = true;
         const wasPaused = !isPlaying;
         if (wasPaused) {
-          socket.emit('play', party.id, videoRef.current.currentTime || 0);
+          socket.emit('play', party.id, mediaElement.currentTime || 0);
           setIsPlaying(true);
         }
         setTimeout(() => { isHandlingPiP = false; }, 100);
@@ -254,178 +226,77 @@ export default function VideoPlayer({
 
     const handlePiPPause = (e: Event) => {
       // Only handle if in PiP mode and not already handling
-      if (isPictureInPicture && !isHandlingPiP && videoRef.current) {
+      if (isPictureInPicture && !isHandlingPiP && mediaElement) {
         isHandlingPiP = true;
         const wasPlaying = isPlaying;
         if (wasPlaying) {
-          socket.emit('pause', party.id, videoRef.current.currentTime || 0);
+          socket.emit('pause', party.id, mediaElement.currentTime || 0);
           setIsPlaying(false);
         }
         setTimeout(() => { isHandlingPiP = false; }, 100);
       }
     };
 
-    const video = videoRef.current;
-    video.addEventListener('play', handlePiPPlay);
-    video.addEventListener('pause', handlePiPPause);
+    mediaElement.addEventListener('play', handlePiPPlay);
+    mediaElement.addEventListener('pause', handlePiPPause);
 
     return () => {
-      video.removeEventListener('play', handlePiPPlay);
-      video.removeEventListener('pause', handlePiPPause);
+      mediaElement.removeEventListener('play', handlePiPPlay);
+      mediaElement.removeEventListener('pause', handlePiPPause);
     };
   }, [videoRef, isPictureInPicture, socket, party.id, isPlaying]);
 
-  const handlePictureInPicture = async () => {
-    if (!videoRef.current) return;
+  // if (getVideoStream.isLoading) {
+  //   return <div>Loading...</div>;
+  // }
 
-    try {
-      if (isPictureInPicture) {
-        // Exit Picture-in-Picture
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        } else if ((document as any).webkitExitPictureInPicture) {
-          await (document as any).webkitExitPictureInPicture();
-        }
-      } else {
-        // Enter Picture-in-Picture
-        if (videoRef.current.requestPictureInPicture) {
-          await videoRef.current.requestPictureInPicture();
-        } else if ((videoRef.current as any).webkitSetPresentationMode) {
-          await (videoRef.current as any).webkitSetPresentationMode('picture-in-picture');
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling Picture-in-Picture:', error);
-    }
-  };
-
-  const formatTime = (time: number) => {
-    if (isNaN(time)) return '0:00';
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+  // if (getVideoStream.error) {
+  //   return <div>Error: {getVideoStream.error.message}</div>;
+  // }
 
   return (
     <Card className="bg-card border border-border overflow-hidden">
       {/* Video Container */}
       <div className="bg-black relative group">
-        <video
+        <MuxPlayer
           ref={videoRef}
-          src={movie.blobUrl}
+          playbackId={movie.blobUrl.includes("mkv") ? movie.playbackId : undefined}
+          src={movie.blobUrl.includes("mkv") ? undefined : movie.blobUrl}
+          metadata={{
+            video_id: movie.id,
+            video_title: movie.title,
+          }}
+          accentColor='#e50914'
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
+          onPlay={() => {
+            const mediaElement = getMediaElement(videoRef);
+            if (mediaElement && socket && party.currentMovieId === movie.id) {
+              setIsPlaying(true);
+              const currentTime = mediaElement.currentTime || 0;
+              socket.emit('play', party.id, currentTime);
+            }
+          }}
+          onPause={() => {
+            const mediaElement = getMediaElement(videoRef);
+            if (mediaElement && socket && party.currentMovieId === movie.id) {
+              setIsPlaying(false);
+              const currentTime = mediaElement.currentTime || 0;
+              socket.emit('pause', party.id, currentTime);
+            }
+          }}
+          onSeeked={() => {
+            const mediaElement = getMediaElement(videoRef);
+            if (mediaElement && socket && party.currentMovieId === movie.id && !isSeeking) {
+              setIsSeeking(true);
+              const newTime = mediaElement.currentTime || 0;
+              socket.emit('seek', party.id, newTime);
+              setTimeout(() => setIsSeeking(false), 500);
+            }
+          }}
           className="w-full h-auto aspect-video"
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
+          style={{ aspectRatio: '16/9' }}
         />
-
-        {/* Controls Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black to-transparent p-4">
-          {/* Progress Bar */}
-          <div className="mb-4 flex items-center gap-2">
-            <input
-              type="range"
-              min="0"
-              max={duration}
-              value={currentTime}
-              onChange={(e) => handleSeek(parseFloat(e.target.value))}
-              className="flex-1 h-1 bg-muted rounded-lg accent-primary cursor-pointer"
-            />
-          </div>
-
-          {/* Control Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handlePlayPause}
-                className="text-white hover:bg-white/20"
-              >
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </Button>
-
-              <div className="text-sm text-white">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Volume1 className="w-4 h-4 text-white" />
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={volume}
-                onChange={(e) => {
-                  const newVolume = parseFloat(e.target.value);
-                  setVolume(newVolume);
-                  if (videoRef.current) {
-                    videoRef.current.volume = newVolume;
-                  }
-                }}
-                className="w-20 h-1 bg-muted rounded-lg accent-primary cursor-pointer"
-              />
-              {isPiPSupported && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handlePictureInPicture}
-                  className="text-white hover:bg-white/20"
-                  title={isPictureInPicture ? 'Exit Picture-in-Picture' : 'Enter Picture-in-Picture'}
-                >
-                  <PictureInPicture className="w-4 h-4" />
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleFullscreen}
-                className="text-white hover:bg-white/20"
-              >
-                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Video Info */}
-      <div className="p-4 bg-card">
-        <h2 className="text-xl font-bold mb-4">{movie.title}</h2>
-
-        {/* Playback Controls */}
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handlePlayPause}
-            className="flex-1"
-          >
-            {isPlaying ? (
-              <>
-                <Pause className="w-4 h-4 mr-2" />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4 mr-2" />
-                Play
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Status */}
-        <div className="mt-4 p-3 bg-background rounded-lg text-sm">
-          <p className="text-muted-foreground">
-            {isPlaying ? '▶️ Playing' : '⏸️ Paused'} • {formatTime(currentTime)} / {formatTime(duration)}
-          </p>
-        </div>
       </div>
     </Card>
   );

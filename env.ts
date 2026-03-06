@@ -6,6 +6,8 @@ export const env = createEnv({
     server: {
         DATABASE_URL: z.string().min(1),
         BLOB_READ_WRITE_TOKEN: z.string().min(1),
+        WATCH_PARTY_MUX_TOKEN_ID: z.string().min(1),
+        WATCH_PARTY_MUX_TOKEN_SECRET: z.string().min(1),
     },
     client: {
     },

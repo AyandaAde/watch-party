@@ -23,6 +23,7 @@ interface Movie {
   title: string;
   blobUrl: string;
   duration: number;
+  playbackId: string;
   isDemo: boolean;
 }
 
@@ -36,7 +37,7 @@ export default function PartyPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMovieLibrary, setShowMovieLibrary] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<any>(null);
 
   useEffect(() => {
     const userId = sessionStorage.getItem('userId');
@@ -110,36 +111,25 @@ export default function PartyPage() {
     });
 
     newSocket.on('play', (data) => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = data.currentTime;
-        videoRef.current.play();
-        setParty((prev) => {
-          if (!prev) return null;
-          return { ...prev, isPlaying: true, currentTime: data.currentTime };
-        });
-      }
+      setParty((prev) => {
+        if (!prev) return null;
+        return { ...prev, isPlaying: true, currentTime: data.currentTime || data };
+      });
     });
 
     newSocket.on('pause', (data) => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = data.currentTime;
-        videoRef.current.pause();
-        setParty((prev) => {
-          if (!prev) return null;
-          return { ...prev, isPlaying: false, currentTime: data.currentTime };
-        });
-      }
+      setParty((prev) => {
+        if (!prev) return null;
+        return { ...prev, isPlaying: false, currentTime: data.currentTime || data };
+      });
     });
 
     newSocket.on('seek', (data) => {
       console.log('[v0] Seek event received');
-      if (videoRef.current) {
-        videoRef.current.currentTime = data.currentTime;
-        setParty((prev) => {
-          if (!prev) return null;
-          return { ...prev, currentTime: data.currentTime };
-        });
-      }
+      setParty((prev) => {
+        if (!prev) return null;
+        return { ...prev, currentTime: data.currentTime || data };
+      });
     });
 
     newSocket.on('next-movie', (data) => {

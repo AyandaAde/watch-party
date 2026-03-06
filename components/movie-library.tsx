@@ -190,7 +190,17 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
         throw new Error('Conversion produced empty output file');
       }
 
-      const blob = new Blob([data], { type: 'video/mp4' });
+      // Convert FileData to Blob-compatible format
+      // FileData can be string or Uint8Array<ArrayBufferLike>
+      let blob: Blob;
+      if (typeof data === 'string') {
+        // If it's a string, convert to blob
+        blob = new Blob([data], { type: 'video/mp4' });
+      } else {
+        // If it's Uint8Array, create a new Uint8Array with ArrayBuffer
+        const uint8Array = new Uint8Array(data);
+        blob = new Blob([uint8Array.buffer], { type: 'video/mp4' });
+      }
       console.log('Output blob created, size:', blob.size);
 
       // Clean up
