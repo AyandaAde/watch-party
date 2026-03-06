@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model WatchParty {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  isActive      Boolean       @default(true)
+  currentMovieId String?
+  currentTime   Float         @default(0)
+  isPlaying     Boolean       @default(false)
+  updatedAt     DateTime      @updatedAt
+  members       PartyMember[]
+}
+
+model Movie {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  title      String
+  blobUrl    String
+  duration   Float
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+  isDemo     Boolean  @default(false)
+  size       Int
+}
+
+model PartyMember {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  partyId  String   @db.ObjectId
+  userId   String
+  username String
+  joinedAt DateTime @default(now())
+  isActive Boolean  @default(true)
+  party    WatchParty @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@index([partyId])
+}
