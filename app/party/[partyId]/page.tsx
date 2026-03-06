@@ -77,7 +77,7 @@ export default function PartyPage() {
     //   transports: ['websocket'],
     // });
 
-    const newSocket = io(`https://swiftlane-backend.onrender.com`, {
+    const newSocket = io(`https://watch-party-7g0j.onrender.com`, {
       reconnectionDelay: 1000,
       reconnection: true,
       reconnectionAttempts: 5,
