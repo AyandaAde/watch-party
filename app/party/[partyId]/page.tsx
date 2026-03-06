@@ -46,7 +46,7 @@ export default function PartyPage() {
       router.push('/');
       return;
     }
-    
+
     const fetchParty = async () => {
       try {
         const response = await fetch(`/api/parties?id=${partyId}`);
@@ -70,12 +70,20 @@ export default function PartyPage() {
     fetchParty();
     fetchMovies();
 
-    const newSocket = io(undefined, {
+    // const newSocket = io(undefined, {
+    //   reconnectionDelay: 1000,
+    //   reconnection: true,
+    //   reconnectionAttempts: 5,
+    //   transports: ['websocket'],
+    // });
+
+    const newSocket = io(`https://swiftlane-backend.onrender.com`, {
       reconnectionDelay: 1000,
       reconnection: true,
       reconnectionAttempts: 5,
-      transports: ['websocket'],
-    });
+      transports: ['websocket']
+    })
+
 
     newSocket.on('connect', () => {
       newSocket.emit('join-party', partyId, userId, username);
