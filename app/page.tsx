@@ -115,7 +115,7 @@ export default function Home() {
         width={100}
         height={100}
         alt="WatchParty logo"
-        className="absolute top-6 left-6 z-20 h-28 w-auto"
+        className="absolute top-6 left-6 z-20 h-12 w-auto"
       />
 
       {/* Hero Section */}
