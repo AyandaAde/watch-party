@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import axios from 'axios';
 import { useMutation } from '@tanstack/react-query';
+import Image from 'next/image';
 
 const createSchema = z.object({
   username: z.string().min(1),
@@ -102,11 +103,25 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="relative min-h-screen bg-background text-foreground flex flex-col overflow-hidden">
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/backdrop.PNG')" }}
+        aria-hidden="true"
+      />
+      <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
+      <Image
+        src="/logo.PNG"
+        width={100}
+        height={100}
+        alt="WatchParty logo"
+        className="absolute top-6 left-6 z-20 h-28 w-auto"
+      />
+
       {/* Hero Section */}
       {mode === 'home' && (
         <>
-          <div className="flex-1 flex items-center justify-center px-4 py-20">
+          <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-20">
             <div className="max-w-4xl w-full">
               <div className="text-center mb-16">
                 <h1 className="text-5xl md:text-7xl font-bold mb-6 text-balance">
@@ -168,7 +183,7 @@ export default function Home() {
 
       {/* Create Party Mode */}
       {mode === 'create' && (
-        <div className="flex-1 flex items-center justify-center px-4 py-20">
+        <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-20">
           <Card className="w-full max-w-md p-8 bg-card border border-border">
             <h2 className="text-3xl font-bold mb-2">Create Party</h2>
             <p className="text-muted-foreground mb-8">Start watching with friends</p>
@@ -214,7 +229,7 @@ export default function Home() {
 
       {/* Join Party Mode */}
       {mode === 'join' && (
-        <div className="flex-1 flex items-center justify-center px-4 py-20">
+        <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-20">
           <Card className="w-full max-w-md p-8 bg-card border border-border">
             <h2 className="text-3xl font-bold mb-2">Join Party</h2>
             <p className="text-muted-foreground mb-8">Join an existing watch party</p>

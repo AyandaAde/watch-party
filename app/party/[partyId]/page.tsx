@@ -8,6 +8,7 @@ import PartyInfo from '@/components/party-info';
 import MovieLibrary from '@/components/movie-library';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import Image from 'next/image';
 
 interface WatchParty {
   id: string;
@@ -23,6 +24,7 @@ interface Movie {
   title: string;
   blobUrl: string;
   duration: number;
+  assetId: string;
   playbackId: string;
   isDemo: boolean;
 }
@@ -167,10 +169,24 @@ export default function PartyPage() {
 
   if (loading || !party) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="p-8 bg-card border border-border">
-          <p className="text-foreground">Loading party...</p>
-        </Card>
+      <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/backdrop.PNG')" }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
+        <img
+          src="/logo.PNG"
+          alt="WatchParty logo"
+          className="absolute top-6 left-6 z-20 h-12 w-auto"
+        />
+
+        <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
+          <Card className="p-8 bg-card border border-border">
+            <p className="text-foreground">Loading party...</p>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -178,8 +194,22 @@ export default function PartyPage() {
   const currentMovie = movies.find((m) => m.id === party.currentMovieId);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/backdrop.PNG')" }}
+        aria-hidden="true"
+      />
+      <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
+      <Image
+        src="/logo.PNG"
+        width={100}
+        height={100}
+        alt="WatchParty logo"
+        className="absolute top-6 left-6 z-20 h-28 w-auto"
+      />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>

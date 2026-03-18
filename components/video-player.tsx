@@ -2,16 +2,14 @@
 
 import { Card } from '@/components/ui/card';
 import MuxPlayer from '@mux/mux-player-react';
-import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
-import { monitorEventLoopDelay } from 'perf_hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Socket } from 'socket.io-client';
 
 interface Movie {
   id: string;
   title: string;
   blobUrl: string;
+  assetId: string;
   playbackId: string;
   duration: number;
 }
@@ -51,6 +49,7 @@ export default function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [isPictureInPicture, setIsPictureInPicture] = useState(false);
+  const lastSyncTimeRef = useRef<number>(0);
 
   useEffect(() => {
     onMovieSelect(movie.id);
@@ -77,7 +76,36 @@ export default function VideoPlayer({
     if (Math.abs(mediaElement.currentTime - party.currentTime) > 1) {
       mediaElement.currentTime = party.currentTime;
       setCurrentTime(party.currentTime);
+      lastSyncTimeRef.current = Date.now();
     }
+  }, [party.currentMovieId, party.isPlaying, party.currentTime, movie.id, videoRef]);
+
+  // Periodic jitter detection and sync
+  useEffect(() => {
+    if (party.currentMovieId !== movie.id) return;
+
+    const syncInterval = setInterval(() => {
+      const mediaElement = getMediaElement(videoRef);
+      if (!mediaElement || !party.isPlaying) return;
+
+      // Don't sync if user just seeked (within last 1.5 seconds)
+      const timeSinceLastSeek = Date.now() - lastSyncTimeRef.current;
+      if (timeSinceLastSeek < 1500) return;
+
+      const localTime = mediaElement.currentTime || 0;
+      const partyTime = party.currentTime || 0;
+      const timeDiff = Math.abs(localTime - partyTime);
+
+      // If drift exceeds 0.5 seconds, sync to party time
+      if (timeDiff > 0.5) {
+        console.log(`[VideoPlayer] Jitter detected: ${timeDiff.toFixed(2)}s drift. Syncing...`);
+        mediaElement.currentTime = partyTime;
+        setCurrentTime(partyTime);
+        lastSyncTimeRef.current = Date.now();
+      }
+    }, 2000); // Check every 2 seconds
+
+    return () => clearInterval(syncInterval);
   }, [party.currentMovieId, party.isPlaying, party.currentTime, movie.id, videoRef]);
 
   const handlePlayPause = (e?: React.MouseEvent) => {
@@ -250,6 +278,7 @@ export default function VideoPlayer({
               setIsSeeking(true);
               const newTime = mediaElement.currentTime || 0;
               socket.emit('seek', party.id, newTime);
+              lastSyncTimeRef.current = Date.now();
               setTimeout(() => setIsSeeking(false), 500);
             }
           }}
