@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import MuxPlayer from '@mux/mux-player-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 
 interface Movie {
@@ -11,6 +11,7 @@ interface Movie {
   blobUrl: string;
   assetId: string;
   playbackId: string;
+  subtitleTrack?: string | null;
   duration: number;
 }
 
@@ -44,202 +45,101 @@ export default function VideoPlayer({
   videoRef,
   onMovieSelect,
 }: VideoPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
-  const [isPictureInPicture, setIsPictureInPicture] = useState(false);
-  const lastSyncTimeRef = useRef<number>(0);
+  const isApplyingRemoteStateRef = useRef(false);
+  const hasUserInteractedRef = useRef(false);
+
+
+  // const uploadSubtitles = useQuery({
+  //   queryKey: ['upload-subtitles', movie.assetId],
+  //   queryFn: async () => {
+  //     const { data } = await axios.post('/api/upload-subtitles', { assetId: movie.assetId });
+  //     console.log('data', data);
+  //     return data.message;
+  //   },
+  //   enabled: !!movie.assetId,
+  // });
 
   useEffect(() => {
     onMovieSelect(movie.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [movie.id]);
 
-  // Sync with party state - only update when party state changes
+  useEffect(() => {
+    const markInteracted = () => {
+      if (hasUserInteractedRef.current) return;
+      hasUserInteractedRef.current = true;
+
+      const mediaElement = getMediaElement(videoRef);
+      if (mediaElement) mediaElement.muted = false;
+    };
+
+    window.addEventListener('pointerdown', markInteracted, { once: true });
+    window.addEventListener('keydown', markInteracted, { once: true });
+
+    const mediaElement = getMediaElement(videoRef);
+    if (mediaElement) mediaElement.muted = true;
+
+    return () => {
+      window.removeEventListener('pointerdown', markInteracted);
+      window.removeEventListener('keydown', markInteracted);
+    };
+  }, [videoRef]);
+
   useEffect(() => {
     const mediaElement = getMediaElement(videoRef);
     if (!mediaElement || party.currentMovieId !== movie.id) return;
 
-    // Sync play/pause state
-    if (party.isPlaying && mediaElement.paused) {
-      mediaElement.play().catch(() => {
-        console.log('[VideoPlayer] Play prevented by browser');
-      });
-      setIsPlaying(true);
-    } else if (!party.isPlaying && !mediaElement.paused) {
-      mediaElement.pause();
-      setIsPlaying(false);
-    }
+    isApplyingRemoteStateRef.current = true;
 
-    // Sync time (only if difference is significant to avoid jitter)
-    if (Math.abs(mediaElement.currentTime - party.currentTime) > 1) {
-      mediaElement.currentTime = party.currentTime;
-      setCurrentTime(party.currentTime);
-      lastSyncTimeRef.current = Date.now();
-    }
-  }, [party.currentMovieId, party.isPlaying, party.currentTime, movie.id, videoRef]);
+    mediaElement.muted = !hasUserInteractedRef.current;
 
-  // Periodic jitter detection and sync
-  useEffect(() => {
-    if (party.currentMovieId !== movie.id) return;
-
-    const syncInterval = setInterval(() => {
-      const mediaElement = getMediaElement(videoRef);
-      if (!mediaElement || !party.isPlaying) return;
-
-      // Don't sync if user just seeked (within last 1.5 seconds)
-      const timeSinceLastSeek = Date.now() - lastSyncTimeRef.current;
-      if (timeSinceLastSeek < 1500) return;
-
-      const localTime = mediaElement.currentTime || 0;
-      const partyTime = party.currentTime || 0;
-      const timeDiff = Math.abs(localTime - partyTime);
-
-      // If drift exceeds 0.5 seconds, sync to party time
-      if (timeDiff > 0.5) {
-        console.log(`[VideoPlayer] Jitter detected: ${timeDiff.toFixed(2)}s drift. Syncing...`);
-        mediaElement.currentTime = partyTime;
-        setCurrentTime(partyTime);
-        lastSyncTimeRef.current = Date.now();
+    if (party.isPlaying) {
+      if (mediaElement.paused) {
+        mediaElement.play().catch(() => {
+          // Autoplay may be blocked until user interaction; user can still play manually.
+        });
       }
-    }, 2000); // Check every 2 seconds
-
-    return () => clearInterval(syncInterval);
-  }, [party.currentMovieId, party.isPlaying, party.currentTime, movie.id, videoRef]);
-
-  const handlePlayPause = (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-
-    if (!socket) {
-      console.warn('[VideoPlayer] Socket not connected');
-      return;
-    }
-
-    const mediaElement = getMediaElement(videoRef);
-    if (!mediaElement) {
-      console.warn('[VideoPlayer] Video element not available');
-      return;
-    }
-
-    const isCurrentlyPaused = mediaElement.paused;
-    const currentTime = mediaElement.currentTime || 0;
-
-    if (isCurrentlyPaused) {
-      mediaElement.play().catch((error) => {
-        console.error('[VideoPlayer] Play failed:', error);
-      });
-      socket.emit('play', party.id, currentTime);
-      setIsPlaying(true);
     } else {
-      mediaElement.pause();
-      socket.emit('pause', party.id, currentTime);
-      setIsPlaying(false);
+      if (!mediaElement.paused) mediaElement.pause();
     }
-  };
 
-  const handleTimeUpdate = () => {
-    const mediaElement = getMediaElement(videoRef);
-    if (mediaElement && !isSeeking) {
-      setCurrentTime(mediaElement.currentTime);
+    if (!isSeeking && Math.abs(mediaElement.currentTime - party.currentTime) > 0.25) {
+      mediaElement.currentTime = party.currentTime;
     }
-  };
 
-  const handleLoadedMetadata = () => {
-    const mediaElement = getMediaElement(videoRef);
-    if (mediaElement) {
-      setDuration(mediaElement.duration);
-    }
-  };
-  
-  // Listen for Picture-in-Picture changes and enable controls
+    const t = window.setTimeout(() => {
+      isApplyingRemoteStateRef.current = false;
+    }, 500);
+
+    return () => window.clearTimeout(t);
+  }, [party.currentMovieId, party.isPlaying, party.currentTime, movie.id, videoRef, isSeeking]);
+
   useEffect(() => {
-    const handlePiPChange = () => {
+    if (!socket) return;
+
+    const handleSeek = (data: any) => {
       const mediaElement = getMediaElement(videoRef);
-      if (mediaElement) {
-        const isInPiP =
-          document.pictureInPictureElement === mediaElement ||
-          (document as any).webkitPictureInPictureElement === mediaElement;
+      if (!mediaElement) return;
+      if (party.currentMovieId !== movie.id) return;
+      if (isSeeking) return;
 
-        setIsPictureInPicture(isInPiP);
+      const nextTime = typeof data?.currentTime === 'number' ? data.currentTime : data;
+      if (typeof nextTime !== 'number' || Number.isNaN(nextTime)) return;
 
-        // Enable native controls when in PiP mode for play/pause functionality
-        if (isInPiP) {
-          mediaElement.setAttribute('controls', '');
-        } else {
-          mediaElement.removeAttribute('controls');
-        }
-      }
+      isApplyingRemoteStateRef.current = true;
+      mediaElement.currentTime = nextTime;
+
+      window.setTimeout(() => {
+        isApplyingRemoteStateRef.current = false;
+      }, 500);
     };
 
-    const mediaElement = getMediaElement(videoRef);
-    if (mediaElement) {
-      mediaElement.addEventListener('enterpictureinpicture', handlePiPChange);
-      mediaElement.addEventListener('leavepictureinpicture', handlePiPChange);
-      // WebKit prefix
-      mediaElement.addEventListener('webkitbeginfullscreen', handlePiPChange);
-      mediaElement.addEventListener('webkitendfullscreen', handlePiPChange);
-    }
-
-    // Also listen on document
-    document.addEventListener('enterpictureinpicture', handlePiPChange);
-    document.addEventListener('leavepictureinpicture', handlePiPChange);
-
+    socket.on('seek', handleSeek);
     return () => {
-      const mediaElement = getMediaElement(videoRef);
-      if (mediaElement) {
-        mediaElement.removeEventListener('enterpictureinpicture', handlePiPChange);
-        mediaElement.removeEventListener('leavepictureinpicture', handlePiPChange);
-        mediaElement.removeEventListener('webkitbeginfullscreen', handlePiPChange);
-        mediaElement.removeEventListener('webkitendfullscreen', handlePiPChange);
-      }
-      document.removeEventListener('enterpictureinpicture', handlePiPChange);
-      document.removeEventListener('leavepictureinpicture', handlePiPChange);
+      socket.off('seek', handleSeek);
     };
-  }, [videoRef]);
-
-  // Handle play/pause events from PiP window controls only
-  useEffect(() => {
-    const mediaElement = getMediaElement(videoRef);
-    if (!mediaElement || !socket || !isPictureInPicture) return;
-
-    let isHandlingPiP = false;
-
-    const handlePiPPlay = (e: Event) => {
-      // Only handle if in PiP mode and not already handling
-      if (isPictureInPicture && !isHandlingPiP && mediaElement) {
-        isHandlingPiP = true;
-        const wasPaused = !isPlaying;
-        if (wasPaused) {
-          socket.emit('play', party.id, mediaElement.currentTime || 0);
-          setIsPlaying(true);
-        }
-        setTimeout(() => { isHandlingPiP = false; }, 100);
-      }
-    };
-
-    const handlePiPPause = (e: Event) => {
-      // Only handle if in PiP mode and not already handling
-      if (isPictureInPicture && !isHandlingPiP && mediaElement) {
-        isHandlingPiP = true;
-        const wasPlaying = isPlaying;
-        if (wasPlaying) {
-          socket.emit('pause', party.id, mediaElement.currentTime || 0);
-          setIsPlaying(false);
-        }
-        setTimeout(() => { isHandlingPiP = false; }, 100);
-      }
-    };
-
-    mediaElement.addEventListener('play', handlePiPPlay);
-    mediaElement.addEventListener('pause', handlePiPPause);
-
-    return () => {
-      mediaElement.removeEventListener('play', handlePiPPlay);
-      mediaElement.removeEventListener('pause', handlePiPPause);
-    };
-  }, [videoRef, isPictureInPicture, socket, party.id, isPlaying]);
+  }, [socket, party.currentMovieId, movie.id, isSeeking, videoRef]);
 
   return (
     <Card className="bg-card border border-border overflow-hidden">
@@ -254,31 +154,32 @@ export default function VideoPlayer({
             video_title: movie.title,
           }}
           accentColor='#e50914'
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
           onPlay={() => {
             const mediaElement = getMediaElement(videoRef);
-            if (mediaElement && socket && party.currentMovieId === movie.id) {
-              setIsPlaying(true);
+            if (mediaElement && socket && party.currentMovieId === movie.id && !isApplyingRemoteStateRef.current) {
               const currentTime = mediaElement.currentTime || 0;
               socket.emit('play', party.id, currentTime);
             }
           }}
           onPause={() => {
             const mediaElement = getMediaElement(videoRef);
-            if (mediaElement && socket && party.currentMovieId === movie.id) {
-              setIsPlaying(false);
+            if (mediaElement && socket && party.currentMovieId === movie.id && !isApplyingRemoteStateRef.current) {
               const currentTime = mediaElement.currentTime || 0;
               socket.emit('pause', party.id, currentTime);
             }
           }}
           onSeeked={() => {
             const mediaElement = getMediaElement(videoRef);
-            if (mediaElement && socket && party.currentMovieId === movie.id && !isSeeking) {
+            if (
+              mediaElement &&
+              socket &&
+              party.currentMovieId === movie.id &&
+              !isSeeking &&
+              !isApplyingRemoteStateRef.current
+            ) {
               setIsSeeking(true);
               const newTime = mediaElement.currentTime || 0;
               socket.emit('seek', party.id, newTime);
-              lastSyncTimeRef.current = Date.now();
               setTimeout(() => setIsSeeking(false), 500);
             }
           }}

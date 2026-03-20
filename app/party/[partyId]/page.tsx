@@ -27,6 +27,7 @@ interface Movie {
   assetId: string;
   playbackId: string;
   isDemo: boolean;
+  subtitleTrack?: string | null;
 }
 
 export default function PartyPage() {

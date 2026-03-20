@@ -20,6 +20,7 @@ interface Movie {
   blobUrl: string;
   duration: number;
   isDemo: boolean;
+  subtitleTrack?: string | null;
 }
 
 interface MovieLibraryProps {
