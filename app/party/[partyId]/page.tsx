@@ -9,6 +9,7 @@ import MovieLibrary from '@/components/movie-library';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import Image from 'next/image';
+import axios from 'axios';
 
 interface WatchParty {
   id: string;
@@ -53,8 +54,7 @@ export default function PartyPage() {
 
     const fetchParty = async () => {
       try {
-        const response = await fetch(`/api/parties?id=${partyId}`);
-        const data = await response.json();
+        const { data } = await axios.get(`/api/parties?id=${partyId}`);
         setParty(data);
       } catch (error) {
         console.error('Error fetching party:', error);
@@ -63,8 +63,11 @@ export default function PartyPage() {
 
     const fetchMovies = async () => {
       try {
-        const response = await fetch('/api/movies');
-        const data = await response.json();
+        const { data } = await axios.get('/api/movies', {
+          params: {
+            partyId,
+          },
+        });
         setMovies(data);
       } catch (error) {
         console.error('Error fetching movies:', error);
@@ -128,7 +131,6 @@ export default function PartyPage() {
     });
 
     newSocket.on('seek', (data) => {
-      console.log('[v0] Seek event received');
       setParty((prev) => {
         if (!prev) return null;
         return { ...prev, currentTime: data.currentTime || data };
@@ -136,7 +138,6 @@ export default function PartyPage() {
     });
 
     newSocket.on('next-movie', (data) => {
-      console.log('[v0] Next movie event received');
       setParty((prev) => {
         if (!prev) return null;
         return { ...prev, currentMovieId: data.movieId, currentTime: 0, isPlaying: true };
@@ -147,7 +148,6 @@ export default function PartyPage() {
     });
 
     newSocket.on('previous-movie', (data) => {
-      console.log('[v0] Previous movie event received');
       setParty((prev) => {
         if (!prev) return null;
         return { ...prev, currentMovieId: data.movieId, currentTime: 0, isPlaying: true };
@@ -193,6 +193,7 @@ export default function PartyPage() {
   }
 
   const currentMovie = movies.find((m) => m.id === party.currentMovieId);
+  console.log('currentMovie', party);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
@@ -207,24 +208,32 @@ export default function PartyPage() {
         width={100}
         height={100}
         alt="WatchParty logo"
-        className="absolute top-6 left-6 z-20 h-12 w-auto"
+        className="absolute top-6 left-6 -z-20 h-12 w-auto"
       />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">{party.name}</h1>
             <p className="text-muted-foreground">Party Code: {partyId.substring(0, 8).toUpperCase()}</p>
           </div>
-          <Button variant="outline" onClick={() => router.push('/')}>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const userId = sessionStorage.getItem('userId');
+              try {
+                await axios.post(`/api/parties/${partyId}/leave`, { userId });
+              } catch (error) {
+                console.error('Failed to leave party:', error);
+              } finally {
+                router.push('/');
+              }
+            }}
+          >
             Leave Party
           </Button>
         </div>
-
-        {/* Main Layout */}
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Video Player */}
           <div className="lg:col-span-2">
             {currentMovie ? (
               <VideoPlayer
@@ -247,8 +256,6 @@ export default function PartyPage() {
                 </div>
               </Card>
             )}
-
-            {/* Movie Library Toggle */}
             <div className="mt-6">
               <Button
                 onClick={() => setShowMovieLibrary(!showMovieLibrary)}
@@ -258,11 +265,10 @@ export default function PartyPage() {
                 {showMovieLibrary ? 'Hide Library' : 'Show Library'}
               </Button>
             </div>
-
-            {/* Movie Library */}
             {showMovieLibrary && (
               <MovieLibrary
                 movies={movies}
+                partyId={partyId}
                 onSelectMovie={(movieId) => {
                   socket?.emit('next-movie', partyId, movieId, 0);
                   setShowMovieLibrary(false);
@@ -270,8 +276,6 @@ export default function PartyPage() {
               />
             )}
           </div>
-
-          {/* Sidebar */}
           <div>
             <PartyInfo party={party} />
           </div>

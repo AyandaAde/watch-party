@@ -25,8 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(party);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("[v0] Error creating party:", errorMessage);
-    console.error("[v0] Full error:", error);
+    console.error("Error creating party:", errorMessage);
     return NextResponse.json({ 
       error: "Failed to create party",
       details: errorMessage 
@@ -56,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(party);
   } catch (error) {
-    console.error("[v0] Error fetching party:", error);
+    console.error("Error fetching party:", error);
     return NextResponse.json({ error: "Failed to fetch party" }, { status: 500 });
   }
 }

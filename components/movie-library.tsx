@@ -25,10 +25,11 @@ interface Movie {
 
 interface MovieLibraryProps {
   movies: Movie[];
+  partyId: string;
   onSelectMovie: (movieId: string) => void;
 }
 
-export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProps) {
+export default function MovieLibrary({ movies, partyId, onSelectMovie }: MovieLibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [converting, setConverting] = useState(false);
@@ -75,44 +76,6 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
     },
   ];
 
-  // Preload FFmpeg on component mount
-  useEffect(() => {
-    loadFFmpeg().catch((error) => {
-      console.error('Failed to preload FFmpeg:', error);
-      toast.error("FFmpeg Error", { 
-        description: "Failed to load video converter. MKV conversion may not work." 
-      });
-    });
-  }, []);
-
-  // Load FFmpeg
-  const loadFFmpeg = async () => {
-    if (ffmpegLoaded && ffmpegRef.current) return;
-
-    try {
-      const ffmpeg = new FFmpeg();
-      ffmpegRef.current = ffmpeg;
-
-      // Add progress logging
-      ffmpeg.on('log', ({ message }) => {
-        console.log('[FFmpeg]', message);
-      });
-
-      // Use UMD build for better compatibility
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      });
-
-      setFfmpegLoaded(true);
-      console.log('FFmpeg loaded successfully');
-    } catch (error) {
-      console.error('Failed to load FFmpeg:', error);
-      throw new Error(`Failed to load FFmpeg: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-  
   const getVideoDuration = (file: File): Promise<number> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
@@ -150,8 +113,7 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
           handleUploadUrl: '/api/upload',
           multipart: true,
           clientPayload,
-      });
-        console.log('blob', blob);
+        });
         return blob;
       } catch (error) {
         console.error('Error uploading movie:', error);
@@ -165,36 +127,20 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
     if (!file) return;
 
     try {
-      setLoading(true);
-      
-      // Check if file is MKV and convert to MP4
       let fileToUpload = file;
-      if (file.name.toLowerCase().endsWith('.mkv')) {
-        try {
-          toast.info("Converting", { description: 'Converting MKV to MP4... This may take a while.' });
-          // fileToUpload = await convertMkvToMp4(file);
-          toast.success("Converted", { description: 'MKV file converted to MP4 successfully!' });
-        } catch (conversionError) {
-          console.error('Conversion failed:', conversionError);
-          toast.warning("Conversion Failed", { 
-            description: 'Failed to convert MKV file. Uploading original file instead.' 
-          });
-          return
-        }
-      }
 
       const duration = await getVideoDuration(fileToUpload);
-      
+
       uploadMovie.mutate(
         { file: fileToUpload, duration },
         {
           onSuccess: async (data) => {
-            console.log("Saving movie", data);
             await axios.post('/api/movies', {
+              partyId,
               title: file.name,
               blobUrl: data.url,
               duration: duration.toString(),
-            uploadedBy: sessionStorage.getItem('userId') || 'anonymous',
+              uploadedBy: sessionStorage.getItem('userId') || 'anonymous',
               size: file.size.toString(),
             }).then(() => {
               setLoading(false);
@@ -206,12 +152,12 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
               toast.error("Error", { description: 'Failed to save movie. Please try again.' });
               router.refresh();
             });
-      },
-      onError: (error) => {
-        console.error('Upload error', error);
+          },
+          onError: (error) => {
+            console.error('Upload error', error);
             setLoading(false);
             toast.error("Error", { description: 'Failed to upload movie. Please try again.' });
-      },
+          },
         }
       );
     } catch (error) {
@@ -229,91 +175,88 @@ export default function MovieLibrary({ movies, onSelectMovie }: MovieLibraryProp
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-          <Loader loadingStates={loadingStates} loading={uploadMovie.isPending} duration={2000} />
-    <div className="mt-8 space-y-6">
-      {/* Search and Upload */}
-      <div className="flex gap-2">
-        <Input
-          placeholder="Search movies..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 bg-background border-border"
-        />
-        <label className="cursor-pointer">
-          <Button
-            asChild
-            variant="outline"
+      <Loader loadingStates={loadingStates} loading={uploadMovie.isPending} duration={2000} />
+      <div className="mt-8 space-y-6">
+        {/* Search and Upload */}
+        <div className="flex gap-2">
+          <Input
+            placeholder="Search movies..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-background border-border"
+          />
+          <label className="cursor-pointer">
+            <Button
+              asChild
+              variant="outline"
               disabled={uploadMovie.isPending || converting || loading}
-          >
-            <span>
+            >
+              <span>
                 <Upload className="size-4mr-2" />
                 {converting ? 'Converting...' : uploadMovie.isPending ? 'Uploading...' : 'Upload'}
-            </span>
-          </Button>
-          <Input
-            type="file"
-            accept="video/*"
-            onChange={handleFileUpload}
-            className="hidden"
+              </span>
+            </Button>
+            <Input
+              type="file"
+              accept="video/*"
+              onChange={handleFileUpload}
+              className="hidden"
               disabled={uploadMovie.isPending || converting || loading}
-          />
-        </label>
-      </div>
+            />
+          </label>
+        </div>
 
-      {/* Demo Movies */}
-      {demoMovies.length > 0 && (
-        <div>
-          <h3 className="font-semibold mb-3">Demo Movies</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {demoMovies.map((movie) => (
-              <Card
-                key={movie.id}
+        {demoMovies.length > 0 && (
+          <div>
+            <h3 className="font-semibold mb-3">Demo Movies</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {demoMovies.map((movie) => (
+                <Card
+                  key={movie.id}
                   className="p-3 bg-card border border-border hover:border-primary cursor-pointer transition-colors overflow-hidden"
-                onClick={() => onSelectMovie(movie.id)}
-              >
+                  onClick={() => onSelectMovie(movie.id)}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm truncate" title={movie.title}>{movie.title}</h4>
-                    <p className="text-xs text-muted-foreground mt-1">Demo • {Math.floor(movie.duration)}s</p>
-                  </div>
+                      <p className="text-xs text-muted-foreground mt-1">Demo • {Math.floor(movie.duration)}s</p>
+                    </div>
                     <Play className="w-4 h-4 text-primary shrink-0" />
-                </div>
-              </Card>
-            ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Uploaded Movies */}
-      {uploadedMovies.length > 0 && (
-        <div>
-          <h3 className="font-semibold mb-3">Uploaded Movies</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {uploadedMovies.map((movie) => (
-              <Card
-                key={movie.id}
+        {uploadedMovies.length > 0 && (
+          <div>
+            <h3 className="font-semibold mb-3">Uploaded Movies</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {uploadedMovies.map((movie) => (
+                <Card
+                  key={movie.id}
                   className="p-3 bg-card border border-border hover:border-primary cursor-pointer transition-colors overflow-hidden"
-                onClick={() => onSelectMovie(movie.id)}
-              >
+                  onClick={() => onSelectMovie(movie.id)}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm truncate" title={movie.title}>{movie.title}</h4>
-                    <p className="text-xs text-muted-foreground mt-1">{Math.floor(movie.duration)}s</p>
-                  </div>
+                      <p className="text-xs text-muted-foreground mt-1">{Math.floor(movie.duration)}s</p>
+                    </div>
                     <Play className="w-4 h-4 text-primary shrink-0" />
-                </div>
-              </Card>
-            ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {filteredMovies.length === 0 && (
-        <Card className="p-8 bg-card border border-border text-center">
-          <p className="text-muted-foreground">No movies found. Upload a movie to get started!</p>
-        </Card>
-      )}
+        )}
+        
+        {filteredMovies.length === 0 && (
+          <Card className="p-8 bg-card border border-border text-center">
+            <p className="text-muted-foreground">No movies found. Upload a movie to get started!</p>
+          </Card>
+        )}
       </div>
     </div>
   );

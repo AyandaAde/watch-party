@@ -10,7 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model WatchParty {
+model watchParty {
   id             String        @id @default(auto()) @map("_id") @db.ObjectId
   name           String
   createdBy      String
@@ -20,31 +20,39 @@ model WatchParty {
   currentTime    Float         @default(0)
   isPlaying      Boolean       @default(false)
   updatedAt      DateTime      @updatedAt
-  members        PartyMember[]
+  members        partyMember[]
+  movies         movie[]
+
+  @@map("watchParties")
 }
 
-model Movie {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+model movie {
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
   title         String
   blobUrl       String
+  partyId       String  @db.ObjectId
   assetId       String?
   playbackId    String?
-  subtitleTrack String?
   duration      Float
   uploadedBy    String
-  uploadedAt    DateTime @default(now())
-  isDemo        Boolean  @default(false)
-  size          Int
+
+  party      watchParty @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  uploadedAt DateTime   @default(now())
+  isDemo     Boolean    @default(false)
+  size       Int
+
+  @@map("movies")
 }
 
-model PartyMember {
+model partyMember {
   id       String     @id @default(auto()) @map("_id") @db.ObjectId
   partyId  String     @db.ObjectId
   userId   String
   username String
   joinedAt DateTime   @default(now())
   isActive Boolean    @default(true)
-  party    WatchParty @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  party    watchParty @relation(fields: [partyId], references: [id], onDelete: Cascade)
 
   @@index([partyId])
+  @@map("partyMembers")
 }
