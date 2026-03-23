@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import io, { Socket } from 'socket.io-client';
-import VideoPlayer from '@/components/video-player';
-import PartyInfo from '@/components/party-info';
 import MovieLibrary from '@/components/movie-library';
+import PartyInfo from '@/components/party-info';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import Image from 'next/image';
+import VideoPlayer from '@/components/video-player';
+import { convertSrtUrlToVttAndDownload } from '@/lib/convertSubtitles';
 import axios from 'axios';
+import Image from 'next/image';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import io, { Socket } from 'socket.io-client';
 
 interface WatchParty {
   id: string;
@@ -42,6 +43,11 @@ export default function PartyPage() {
   const [loading, setLoading] = useState(true);
   const [showMovieLibrary, setShowMovieLibrary] = useState(false);
   const videoRef = useRef<any>(null);
+
+
+  // useEffect(() => {
+  //   convertSrtUrlToVttAndDownload("https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/Hamilton.2020.720p.Web.h264-Watcher-HI.srt" ,"hamilton-subtitles.vtt");
+  // }, [party]);
 
   useEffect(() => {
     const userId = sessionStorage.getItem('userId');
@@ -193,7 +199,6 @@ export default function PartyPage() {
   }
 
   const currentMovie = movies.find((m) => m.id === party.currentMovieId);
-  console.log('currentMovie', party);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-hidden">

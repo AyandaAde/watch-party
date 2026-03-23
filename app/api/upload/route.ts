@@ -1,6 +1,5 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
@@ -46,10 +45,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         console.log('blob upload completed', blob, tokenPayload);
 
         try {
-          // Parse metadata from tokenPayload
-          const metadata = JSON.parse(tokenPayload || '{}');
           
-          console.log('Movie saved to database');
         } catch (error) {
           console.error('Error saving movie to database:', error);
           // Don't throw error here to avoid retrying the upload

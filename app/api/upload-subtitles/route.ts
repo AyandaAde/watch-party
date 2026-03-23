@@ -5,9 +5,12 @@ export async function POST(request: NextRequest) {
     const {assetId, url} = await request.json();
     console.log('assetId', assetId);
 
+    await mux.video.assets.deleteTrack(assetId, "dgUJEE003m4UVrYY3H102f8fNFRkthtlh7YDY4tka2oER5RKkuk1J4wQ");
+
+
     try {
         await mux.video.assets.createTrack(assetId, {
-            url: 'https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/subtitles.vtt',
+            url,
             type: 'text',
             text_type: 'subtitles',
             language_code: 'en',

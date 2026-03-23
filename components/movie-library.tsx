@@ -32,9 +32,6 @@ interface MovieLibraryProps {
 export default function MovieLibrary({ movies, partyId, onSelectMovie }: MovieLibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [converting, setConverting] = useState(false);
-  const ffmpegRef = useRef<FFmpeg | null>(null);
-  const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
   const router = useRouter();
 
   const loadingStates = [
@@ -45,7 +42,7 @@ export default function MovieLibrary({ movies, partyId, onSelectMovie }: MovieLi
       text: "Buying a condo",
     },
     {
-      text: "Travelling to Cabo",
+      text: "Traveling to Cabo",
     },
     {
       text: "Meeting Hannah Dodd",
@@ -114,6 +111,7 @@ export default function MovieLibrary({ movies, partyId, onSelectMovie }: MovieLi
           multipart: true,
           clientPayload,
         });
+        console.log('blob', blob);
         return blob;
       } catch (error) {
         console.error('Error uploading movie:', error);
@@ -189,11 +187,11 @@ export default function MovieLibrary({ movies, partyId, onSelectMovie }: MovieLi
             <Button
               asChild
               variant="outline"
-              disabled={uploadMovie.isPending || converting || loading}
+              disabled={uploadMovie.isPending || loading}
             >
               <span>
-                <Upload className="size-4mr-2" />
-                {converting ? 'Converting...' : uploadMovie.isPending ? 'Uploading...' : 'Upload'}
+                <Upload className="size-4 mr-2" />
+                {uploadMovie.isPending ? 'Uploading...' : 'Upload'}
               </span>
             </Button>
             <Input
@@ -201,11 +199,10 @@ export default function MovieLibrary({ movies, partyId, onSelectMovie }: MovieLi
               accept="video/*"
               onChange={handleFileUpload}
               className="hidden"
-              disabled={uploadMovie.isPending || converting || loading}
+              disabled={uploadMovie.isPending || loading}
             />
           </label>
         </div>
-
         {demoMovies.length > 0 && (
           <div>
             <h3 className="font-semibold mb-3">Demo Movies</h3>
@@ -227,8 +224,7 @@ export default function MovieLibrary({ movies, partyId, onSelectMovie }: MovieLi
               ))}
             </div>
           </div>
-        )}
-
+        )}  
         {uploadedMovies.length > 0 && (
           <div>
             <h3 className="font-semibold mb-3">Uploaded Movies</h3>

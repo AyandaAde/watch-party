@@ -106,7 +106,7 @@ export default function Home() {
     <div className="relative min-h-screen bg-background text-foreground flex flex-col overflow-hidden">
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/backdrop.PNG')" }}
+        style={{ backgroundImage: "url('/backdrop.PNG')", opacity: 0.5 }}
         aria-hidden="true"
       />
       <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
@@ -233,7 +233,6 @@ export default function Home() {
           <Card className="w-full max-w-md p-8 bg-card border border-border">
             <h2 className="text-3xl font-bold mb-2">Join Party</h2>
             <p className="text-muted-foreground mb-8">Join an existing watch party</p>
-
             <form onSubmit={joinForm.handleSubmit(handleJoinParty)} className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Your Name</label>

@@ -2,6 +2,8 @@
 
 import { Card } from '@/components/ui/card';
 import MuxPlayer from '@mux/mux-player-react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 
@@ -50,15 +52,18 @@ export default function VideoPlayer({
   const hasUserInteractedRef = useRef(false);
 
 
-  // const uploadSubtitles = useQuery({
-  //   queryKey: ['upload-subtitles', movie.assetId],
-  //   queryFn: async () => {
-  //     const { data } = await axios.post('/api/upload-subtitles', { assetId: movie.assetId });
-  //     console.log('data', data);
-  //     return data.message;
-  //   },
-  //   enabled: !!movie.assetId,
-  // });
+  const uploadSubtitles = useQuery({
+    queryKey: ['upload-subtitles', movie.assetId],
+    queryFn: async () => {
+      const { data } = await axios.post('/api/upload-subtitles', {
+        assetId: movie.assetId,
+        url: "https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/hamilton-subtitles.vtt"
+      });
+      console.log('data', data);
+      return data.message;
+    },
+    enabled: !!movie.assetId,
+  });
 
   useEffect(() => {
     onMovieSelect(movie.id);
