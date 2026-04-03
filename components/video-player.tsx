@@ -52,18 +52,18 @@ export default function VideoPlayer({
   const hasUserInteractedRef = useRef(false);
 
 
-  const uploadSubtitles = useQuery({
-    queryKey: ['upload-subtitles', movie.assetId],
-    queryFn: async () => {
-      const { data } = await axios.post('/api/upload-subtitles', {
-        assetId: movie.assetId,
-        url: "https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/hoppers-subtitles.vtt"
-      });
+  // const uploadSubtitles = useQuery({
+  //   queryKey: ['upload-subtitles', movie.assetId],
+  //   queryFn: async () => {
+  //     const { data } = await axios.post('/api/upload-subtitles', {
+  //       assetId: movie.assetId,
+  //       url: "https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/hoppers-subtitles.vtt"
+  //     });
 
-      return data.message;
-    },
-    enabled: !!movie.assetId,
-  });
+  //     return data.message;
+  //   },
+  //   enabled: !!movie.assetId,
+  // });
 
   useEffect(() => {
     onMovieSelect(movie.id);
@@ -153,6 +153,11 @@ export default function VideoPlayer({
         <MuxPlayer
           ref={videoRef}
           playbackId={movie.playbackId}
+          src={undefined}
+          metadata={{
+            video_id: movie.id,
+            video_title: movie.title,
+          }}
           accentColor='#e50914'
           onPause={() => {
             const mediaElement = getMediaElement(videoRef);
