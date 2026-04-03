@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import VideoPlayer from '@/components/video-player';
 import { convertSrtUrlToVttAndDownload } from '@/lib/convertSubtitles';
+import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
@@ -44,9 +45,8 @@ export default function PartyPage() {
   const [showMovieLibrary, setShowMovieLibrary] = useState(false);
   const videoRef = useRef<any>(null);
 
-
   // useEffect(() => {
-  //   convertSrtUrlToVttAndDownload("https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/Hamilton.2020.720p.Web.h264-Watcher-HI.srt" ,"hamilton-subtitles.vtt");
+  //   convertSrtUrlToVttAndDownload("https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/Hoppers.2026.1080p.DCP.MULTi.Line.Audio.x264-SyncUP-en-en.srt" ,"hoppers-subtitles.vtt");
   // }, [party]);
 
   useEffect(() => {

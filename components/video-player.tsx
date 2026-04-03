@@ -57,9 +57,9 @@ export default function VideoPlayer({
     queryFn: async () => {
       const { data } = await axios.post('/api/upload-subtitles', {
         assetId: movie.assetId,
-        url: "https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/hamilton-subtitles.vtt"
+        url: "https://bwmmuzylky4hiheu.public.blob.vercel-storage.com/hoppers-subtitles.vtt"
       });
-      console.log('data', data);
+
       return data.message;
     },
     enabled: !!movie.assetId,
@@ -152,20 +152,8 @@ export default function VideoPlayer({
       <div className="bg-black relative group">
         <MuxPlayer
           ref={videoRef}
-          playbackId={movie.blobUrl.includes("mkv") ? movie.playbackId : undefined}
-          src={movie.blobUrl.includes("mkv") ? undefined : movie.blobUrl}
-          metadata={{
-            video_id: movie.id,
-            video_title: movie.title,
-          }}
+          playbackId={movie.playbackId}
           accentColor='#e50914'
-          onPlay={() => {
-            const mediaElement = getMediaElement(videoRef);
-            if (mediaElement && socket && party.currentMovieId === movie.id && !isApplyingRemoteStateRef.current) {
-              const currentTime = mediaElement.currentTime || 0;
-              socket.emit('play', party.id, currentTime);
-            }
-          }}
           onPause={() => {
             const mediaElement = getMediaElement(videoRef);
             if (mediaElement && socket && party.currentMovieId === movie.id && !isApplyingRemoteStateRef.current) {

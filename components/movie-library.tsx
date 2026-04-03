@@ -3,16 +3,14 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { MultiStepLoader as Loader } from "@/components/ui/multi-step-loader";
 import { useMutation } from '@tanstack/react-query';
 import { upload } from '@vercel/blob/client';
+import axios from 'axios';
 import { Play, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { MultiStepLoader as Loader } from "@/components/ui/multi-step-loader";
-import axios from 'axios';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 interface Movie {
   id: string;
